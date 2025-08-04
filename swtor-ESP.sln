@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36327.8 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "swtor-ESP", "swtor-ESP.csproj", "{56DF52A3-AC86-470F-9234-479FA9B547D5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Debug|x64.ActiveCfg = Debug|x64
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Debug|x64.Build.0 = Debug|x64
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Release|x64.ActiveCfg = Release|x64
+		{56DF52A3-AC86-470F-9234-479FA9B547D5}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {065F61D6-2871-4D33-846F-38B0CFB1DDE5}
+	EndGlobalSection
+EndGlobal
