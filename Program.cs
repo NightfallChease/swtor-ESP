@@ -11,6 +11,7 @@ namespace swtor_ESP
 {
     internal class Program : Overlay
     {
+        //set invariant culture
         Program() : base(2560, 1440) { }
         public static Program p = new Program();
         public static Mem m = new Mem();
@@ -33,8 +34,7 @@ namespace swtor_ESP
 
         static void Main()
         {
-            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
+            AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             Console.WriteLine("SWTOR-ESP Test");
             int PID = m.GetProcIdFromName("swtor.exe");
             if (PID == 0)
@@ -59,33 +59,26 @@ namespace swtor_ESP
                 }
                 if(entlistAddrStr != "")
                 {
-                    //ReadEnts(); //old hook
+                    ReadEnts();
                     AddEntsToList();
+                    UpdateEnts();
                 }
             }
         }
         public static void AddEntsToList()
         {
-            if (string.IsNullOrEmpty(entListPtrAddr) || entListPtrAddr == "00")
-                return;
-            for (int i = 0; i < 100; i++)
+            if (string.IsNullOrEmpty(entBaseAddrStr) || entBaseAddrStr == "00")
             {
-                // Each entity pointer is probably at entListPtrAddr + i * 0x10 (common in game engines)
-                long entBase = m.ReadMemory<long>($"{entListPtrAddr}+{i * 0x10:X}");
-                if (entBase == 0)
-                    continue;
-
-                string entBaseAddrStr = entBase.ToString("X2");
-
-                if (entList.Any(ent => ent.baseAddrStr == entBaseAddrStr))
-                    continue;
-
-                Entity nent = new Entity();
-                nent.baseAddrStr = entBaseAddrStr;
-
-                entList.Add(nent);
+                return;
             }
-            //Console.WriteLine($"Read {entList.Count} entities");
+
+            if (!entList.Any(ent => ent.baseAddrStr == entBaseAddrStr))
+            {
+                Entity newEnt = new Entity { baseAddrStr = entBaseAddrStr };
+                entList.Add(newEnt);
+                Console.WriteLine("Added Entity: " + entBaseAddrStr);
+                Console.WriteLine($"Coords: X-{newEnt.coords.X.ToString()}, Y-{newEnt.coords.Y.ToString()}, Z-{newEnt.coords.Z.ToString()}");
+            }
         }
         public static void UpdateEnts()
         {
@@ -100,36 +93,34 @@ namespace swtor_ESP
                 }
             }
             catch { }
-
         }
         public static void EntHook()
         {
-            //if(entlistAddrStr != "")
-            //{
-            //    UIntPtr codeCaveAddr = m.CreateCodeCave(entlistAddrStr, entlistHookBytes, 7, 240);
-            //    entBaseAddr = codeCaveAddr + entbaseOffset;
-            //    entBaseAddrStr = ConvertUintToStr(entBaseAddr);
-            //    entlistHooked = true;
-            //}
-            if (entlistAddrStr != "")
+            if(entlistAddrStr != "")
             {
-                var ptrAddr = m.Get64BitCode(entListPtr);
-                entListPtrAddr = ptrAddr.ToString("X2");
-                //Console.WriteLine(ptrAddr.ToString("X2"));
+                UIntPtr codeCaveAddr = m.CreateCodeCave(entlistAddrStr, entlistHookBytes, 7, 240);
+                entBaseAddr = codeCaveAddr + entbaseOffset;
+                entBaseAddrStr = ConvertUintToStr(entBaseAddr);
+                entlistHooked = true;
             }
+            //if (entlistAddrStr != "")
+            //{
+            //    var ptrAddr = m.Get64BitCode(entListPtr);
+            //    entListPtrAddr = ptrAddr.ToString("X2");
+            //    //Console.WriteLine(ptrAddr.ToString("X2"));
+            //}
         }
         public static void ReadEnts()
         {
             entBaseAddrStr = ConvertUintToStr(entBaseAddr);
-            UInt64 entBuffer = (UInt64)m.ReadLong(entBaseAddrStr);
-            entBaseAddrStr = ConvertUintToStr(entBuffer);
-            //Console.WriteLine(entBaseAddrStr);
+            long entBuffer = m.ReadMemory<long>(entBaseAddrStr);
+            entBaseAddrStr = entBuffer.ToString("X2");
+            Console.WriteLine(entBaseAddrStr);
             Thread.Sleep(100);
         }
         protected override void Render()
         {
             DrawMenu();
-            UpdateEnts();
             DrawBoxESP();
             //DrawTracelineESP();
             DrawBoxAtOrigin();
@@ -189,7 +180,7 @@ namespace swtor_ESP
 
                     Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
 
-                    if (screenCoords.X != -99)
+                    if (screenCoords.X != -99 && ent.magnitude < 10)
                     {
                         drawlist.AddRect(
                             screenCoords - new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
@@ -456,6 +447,17 @@ namespace swtor_ESP
             UInt64 buf1 = (UInt64)conv;
             string retStr = buf1.ToString("X2");
             return retStr;
+        }
+        private static void OnProcessExit(object sender, EventArgs e)
+        {
+            try
+            {
+                m.WriteMemory(entlistAddrStr, "bytes", "48 8B 01 48 8B 40 58");
+            }
+            catch
+            {
+                Console.WriteLine("Restoring code failed! Please restart the game.");
+            }
         }
     }
 }
