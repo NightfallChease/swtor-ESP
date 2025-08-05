@@ -10,9 +10,8 @@ namespace swtor_ESP
 {
     public class Entity
     {
-        public float xCoord = 0;
-        public float yCoord = 0;
-        public float zCoord = 0;
+        public Vector3 coords;
         public string baseAddrStr = "";
+        public UIntPtr baseAddr = 0x0;
     }
 }

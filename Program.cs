@@ -17,6 +17,10 @@ namespace swtor_ESP
         public static List<Entity> entList = new List<Entity> { };
         public bool isESPEnabled = false;
         public static string cameraAddrStr = "swtor.exe+01BFB168";
+        //new entStuff
+        public static string entListPtr = "swtor.exe+0x01BAE188,0x00,0x3F8,0x1A0";
+        public static string entListPtrAddr = "";
+        //old entHook
         public static string entlistAOB = "48 8B 01 48 8B 40 58 FF 15 ?? ?? ?? ?? 48 8B C8";
         public static UIntPtr codeCaveAddr = 0x0;
         public static UIntPtr entBaseAddr = 0x0;
@@ -54,27 +58,60 @@ namespace swtor_ESP
                 }
                 if(entlistAddrStr != "")
                 {
-                    ReadEnts();
+                    //ReadEnts(); //old hook
                     AddEntsToList();
+                    //UpdateEntPos();
                 }
             }
         }
         public static void AddEntsToList()
         {
-            if (string.IsNullOrEmpty(entBaseAddrStr) || entBaseAddrStr == "00")
-            {
+            if (string.IsNullOrEmpty(entListPtrAddr) || entListPtrAddr == "00")
                 return;
-            }
-
-            if (!entList.Any(ent => ent.baseAddrStr == entBaseAddrStr))
+            for (int i = 0; i < 80; i++)
             {
-                Entity newEnt = new Entity { baseAddrStr = entBaseAddrStr };
-                newEnt.xCoord = m.ReadMemory<float>($"{entBaseAddr},0x68");
-                newEnt.yCoord = m.ReadFloat($"{entBaseAddrStr},0x6C");
-                newEnt.zCoord = m.ReadFloat($"{entBaseAddrStr},0x70");
-                entList.Add(newEnt);
-                Console.WriteLine("Added Entity: " + entBaseAddrStr);
-                Console.WriteLine($"Coords: X-{newEnt.xCoord.ToString()}, Y-{newEnt.yCoord.ToString()}, Z-{newEnt.zCoord.ToString()}");
+                // Each entity pointer is probably at entListPtrAddr + i * 0x10 (common in game engines)
+                long entBase = m.ReadMemory<long>($"{entListPtrAddr}+{i * 0x10:X}");
+                if (entBase == 0)
+                    continue;
+
+                string entBaseAddrStr = entBase.ToString("X2");
+
+                if (entList.Any(ent => ent.baseAddrStr == entBaseAddrStr))
+                    continue;
+
+                Entity nent = new Entity();
+                nent.baseAddrStr = entBaseAddrStr;
+                nent.coords.X = m.ReadFloat($"{entBaseAddrStr}+0x68");
+                nent.coords.Y = m.ReadFloat($"{entBaseAddrStr}+0x6C");
+                nent.coords.Z = m.ReadFloat($"{entBaseAddrStr}+0x70");
+
+                entList.Add(nent);
+            }
+            Console.WriteLine($"Read {entList.Count} entities");
+        }
+
+        public static void UpdateEntPos()
+        {
+            foreach (Entity ent in entList)
+            {
+                //updatePos
+            }
+        }
+        public static void EntHook()
+        {
+            //if(entlistAddrStr != "")
+            //{
+            //    UIntPtr codeCaveAddr = m.CreateCodeCave(entlistAddrStr, entlistHookBytes, 7, 240);
+            //    entBaseAddr = codeCaveAddr + entbaseOffset;
+            //    entBaseAddrStr = ConvertUintToStr(entBaseAddr);
+            //    entlistHooked = true;
+            //}
+            if (entlistAddrStr != "")
+            {
+                var ptrAddr = m.Get64BitCode(entListPtr);
+                entListPtrAddr = ptrAddr.ToString("X2");
+                Console.WriteLine(ptrAddr.ToString("X2"));
             }
         }
         public static void ReadEnts()
@@ -90,16 +127,6 @@ namespace swtor_ESP
             DrawMenu();
             DrawESP();
             DrawBoxAtOrigin();
-        }
-        static void EntHook()
-        {
-            if(entlistAddrStr != "")
-            {
-                UIntPtr codeCaveAddr = m.CreateCodeCave(entlistAddrStr, entlistHookBytes, 7, 240);
-                entBaseAddr = codeCaveAddr + entbaseOffset;
-                entBaseAddrStr = ConvertUintToStr(entBaseAddr);
-                entlistHooked = true;
-            }
         }
         static void AOBScan()
         {
