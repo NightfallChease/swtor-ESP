@@ -61,7 +61,6 @@ namespace swtor_ESP
                 {
                     //ReadEnts(); //old hook
                     AddEntsToList();
-                    UpdateEnts();
                 }
             }
         }
@@ -90,13 +89,18 @@ namespace swtor_ESP
         }
         public static void UpdateEnts()
         {
-            foreach (Entity ent in entList)
+            try
             {
-                ent.coords.X = m.ReadFloat($"{ent.baseAddrStr}+0x68");
-                ent.coords.Y = m.ReadFloat($"{ent.baseAddrStr}+0x6C");
-                ent.coords.Z = m.ReadFloat($"{ent.baseAddrStr}+0x70");
-                ent.magnitude = Vector3.Distance(camPos, ent.coords); // Calculate distance to camera
+                foreach (Entity ent in entList)
+                {
+                    ent.coords.X = m.ReadFloat($"{ent.baseAddrStr}+0x68");
+                    ent.coords.Y = m.ReadFloat($"{ent.baseAddrStr}+0x6C");
+                    ent.coords.Z = m.ReadFloat($"{ent.baseAddrStr}+0x70");
+                    ent.magnitude = Vector3.Distance(camPos, ent.coords); // Calculate distance to camera
+                }
             }
+            catch { }
+
         }
         public static void EntHook()
         {
@@ -125,6 +129,7 @@ namespace swtor_ESP
         protected override void Render()
         {
             DrawMenu();
+            UpdateEnts();
             DrawBoxESP();
             //DrawTracelineESP();
             DrawBoxAtOrigin();
@@ -175,23 +180,27 @@ namespace swtor_ESP
             float[,] viewProj = MultiplyMatrices(view, proj);
 
             // Loop through entities instead of drawing a single fixed box
-            foreach (Entity ent in entList)
+            try
             {
-                if (ent.coords == Vector3.Zero)
-                    continue;
-
-                Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
-
-                if (screenCoords.X != -99)
+                foreach (Entity ent in entList)
                 {
-                    drawlist.AddRect(
-                        screenCoords - new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
-                        screenCoords + new Vector2(50, 50),
-                        ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
-                    );
-                    drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                    if (ent.coords == Vector3.Zero)
+                        continue;
+
+                    Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
+
+                    if (screenCoords.X != -99)
+                    {
+                        drawlist.AddRect(
+                            screenCoords - new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
+                            screenCoords + new Vector2(50, 50),
+                            ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
+                        );
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                    }
                 }
             }
+            catch { }
 
             ImGui.End();
         }
