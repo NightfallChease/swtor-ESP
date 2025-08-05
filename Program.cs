@@ -29,6 +29,7 @@ namespace swtor_ESP
         public static string entBaseAddrStr = "";
         public static string entlistAddrStr = "";
         public static bool entlistHooked = false;
+        public static Vector3 camPos = new Vector3 { };
 
         static void Main()
         {
@@ -60,7 +61,7 @@ namespace swtor_ESP
                 {
                     //ReadEnts(); //old hook
                     AddEntsToList();
-                    //UpdateEntPos();
+                    UpdateEnts();
                 }
             }
         }
@@ -68,7 +69,7 @@ namespace swtor_ESP
         {
             if (string.IsNullOrEmpty(entListPtrAddr) || entListPtrAddr == "00")
                 return;
-            for (int i = 0; i < 80; i++)
+            for (int i = 0; i < 100; i++)
             {
                 // Each entity pointer is probably at entListPtrAddr + i * 0x10 (common in game engines)
                 long entBase = m.ReadMemory<long>($"{entListPtrAddr}+{i * 0x10:X}");
@@ -82,20 +83,19 @@ namespace swtor_ESP
 
                 Entity nent = new Entity();
                 nent.baseAddrStr = entBaseAddrStr;
-                nent.coords.X = m.ReadFloat($"{entBaseAddrStr}+0x68");
-                nent.coords.Y = m.ReadFloat($"{entBaseAddrStr}+0x6C");
-                nent.coords.Z = m.ReadFloat($"{entBaseAddrStr}+0x70");
 
                 entList.Add(nent);
             }
-            Console.WriteLine($"Read {entList.Count} entities");
+            //Console.WriteLine($"Read {entList.Count} entities");
         }
-
-        public static void UpdateEntPos()
+        public static void UpdateEnts()
         {
             foreach (Entity ent in entList)
             {
-                //updatePos
+                ent.coords.X = m.ReadFloat($"{ent.baseAddrStr}+0x68");
+                ent.coords.Y = m.ReadFloat($"{ent.baseAddrStr}+0x6C");
+                ent.coords.Z = m.ReadFloat($"{ent.baseAddrStr}+0x70");
+                ent.magnitude = Vector3.Distance(camPos, ent.coords); // Calculate distance to camera
             }
         }
         public static void EntHook()
@@ -111,7 +111,7 @@ namespace swtor_ESP
             {
                 var ptrAddr = m.Get64BitCode(entListPtr);
                 entListPtrAddr = ptrAddr.ToString("X2");
-                Console.WriteLine(ptrAddr.ToString("X2"));
+                //Console.WriteLine(ptrAddr.ToString("X2"));
             }
         }
         public static void ReadEnts()
@@ -125,7 +125,8 @@ namespace swtor_ESP
         protected override void Render()
         {
             DrawMenu();
-            DrawESP();
+            DrawBoxESP();
+            //DrawTracelineESP();
             DrawBoxAtOrigin();
         }
         static void AOBScan()
@@ -140,8 +141,7 @@ namespace swtor_ESP
             ImGui.Checkbox("Enable ESP", ref p.isESPEnabled);
             ImGui.End();
         }
-
-        static void DrawESP()
+        static void DrawBoxESP()
         {
             if (!p.isESPEnabled)
                 return;
@@ -158,29 +158,92 @@ namespace swtor_ESP
                 | ImGuiWindowFlags.NoScrollbar
             );
             ImDrawListPtr drawlist = ImGui.GetWindowDrawList();
-            drawlist.AddText(new Vector2(50, 50), 10, "ESP Overlay");
 
+            // Read camera position
             float camX = m.ReadFloat($"{cameraAddrStr},0x208");
             float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
             float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
 
+            // Read camera angles
             float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
             float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
 
+            // Build view/projection matrices
+            camPos = new Vector3(camX, camY, camZ);
+            float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
+            float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
+            float[,] viewProj = MultiplyMatrices(view, proj);
+
+            // Loop through entities instead of drawing a single fixed box
+            foreach (Entity ent in entList)
+            {
+                if (ent.coords == Vector3.Zero)
+                    continue;
+
+                Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
+
+                if (screenCoords.X != -99)
+                {
+                    drawlist.AddRect(
+                        screenCoords - new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
+                        screenCoords + new Vector2(50, 50),
+                        ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
+                    );
+                    drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                }
+            }
+
+            ImGui.End();
+        }
+        static void DrawTracelineESP()
+        {
+            if (!p.isESPEnabled)
+                return;
+
+            ImGui.SetNextWindowPos(new Vector2(0, 0), ImGuiCond.Always);
+            ImGui.SetNextWindowSize(new Vector2(2560, 1440), ImGuiCond.Always);
+            ImGui.Begin("ESP Overlay",
+                ImGuiWindowFlags.NoTitleBar
+                | ImGuiWindowFlags.NoResize
+                | ImGuiWindowFlags.NoMove
+                | ImGuiWindowFlags.NoCollapse
+                | ImGuiWindowFlags.NoBackground
+                | ImGuiWindowFlags.NoMouseInputs
+                | ImGuiWindowFlags.NoScrollbar
+            );
+            ImDrawListPtr drawlist = ImGui.GetWindowDrawList();
+
+            // Read camera position
+            float camX = m.ReadFloat($"{cameraAddrStr},0x208");
+            float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
+            float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
+
+            // Read camera angles
+            float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
+            float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
+
+            // Build view/projection matrices
             Vector3 camPos = new Vector3(camX, camY, camZ);
             float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
             float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
             float[,] viewProj = MultiplyMatrices(view, proj);
 
-            Vector2 screenCoords = WorldToScreen(new Vector3(0, 0, 0), viewProj, 2560, 1440);
-
-            if (screenCoords.X != -99)
+            // Loop through entities instead of drawing a single fixed box
+            foreach (Entity ent in entList)
             {
-                drawlist.AddRect(
-                    screenCoords - new Vector2(50, 50),
-                    screenCoords + new Vector2(50, 50),
-                    ImGui.ColorConvertFloat4ToU32(new Vector4(1, 0, 0, 1))
-                );
+                if (ent.coords == Vector3.Zero)
+                    continue;
+
+                Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
+
+                if (screenCoords.X != -99)
+                {
+                    drawlist.AddLine(
+                        new Vector2(1280, 1440),
+                        screenCoords + new Vector2(50, 50),
+                        ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
+                    );
+                }
             }
 
             ImGui.End();

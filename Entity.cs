@@ -13,5 +13,6 @@ namespace swtor_ESP
         public Vector3 coords;
         public string baseAddrStr = "";
         public UIntPtr baseAddr = 0x0;
+        public float magnitude;
     }
 }
