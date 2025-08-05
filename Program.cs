@@ -6,12 +6,15 @@ using Memory;
 using SharpDX.Direct3D11;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace swtor_ESP
 {
     internal class Program : Overlay
     {
         //set invariant culture
+        [DllImport("User32.dll", CharSet = CharSet.Unicode)]
+        public static extern int MessageBox(IntPtr h, string m, string c, int type);
         Program() : base(2560, 1440) { }
         public static Program p = new Program();
         public static Mem m = new Mem();
@@ -31,6 +34,7 @@ namespace swtor_ESP
         public static string entlistAddrStr = "";
         public static bool entlistHooked = false;
         public static Vector3 camPos = new Vector3 { };
+        public static float espMaxDistance = 10f;
 
         static void Main()
         {
@@ -128,6 +132,11 @@ namespace swtor_ESP
         static void AOBScan()
         {
             entlistAddrStr = m.AoBScan(entlistAOB).Result.Sum().ToString("X2");
+            if(entlistAddrStr.Length == 0)
+            {
+                MessageBox(0, "Failed to find aob!", "Error", 0);
+                Environment.Exit(0);
+            }
         }
 
         static void DrawMenu()
@@ -135,6 +144,11 @@ namespace swtor_ESP
             ImGui.Begin("SWTOR ESP");
             ImGui.Text("Hello, SWTOR!");
             ImGui.Checkbox("Enable ESP", ref p.isESPEnabled);
+            ImGui.SliderFloat("Max Distance", ref espMaxDistance, 10f, 200f);
+            if (ImGui.Button("Exit"))
+            {
+                Environment.Exit(0);
+            }
             ImGui.End();
         }
         static void DrawBoxESP()
@@ -180,7 +194,7 @@ namespace swtor_ESP
 
                     Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
 
-                    if (screenCoords.X != -99 && ent.magnitude < 10)
+                    if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
                     {
                         drawlist.AddRect(
                             screenCoords - new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
