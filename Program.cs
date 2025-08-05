@@ -1,12 +1,9 @@
 ﻿using System.Globalization;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using ClickableTransparentOverlay;
 using ImGuiNET;
 using Memory;
-using SharpDX.Direct3D11;
-using System.Threading;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace swtor_ESP
 {
@@ -21,10 +18,6 @@ namespace swtor_ESP
         public static List<Entity> entList = new List<Entity> { };
         public bool isESPEnabled = false;
         public static string cameraAddrStr = "swtor.exe+01BFB168";
-        //new entStuff
-        public static string entListPtr = "swtor.exe+0x01BAE188,0x00,0x3F8,0x1A0";
-        public static string entListPtrAddr = "";
-        //old entHook
         public static string entlistAOB = "48 8B 01 48 8B 40 58 FF 15 ?? ?? ?? ?? 48 8B C8";
         public static UIntPtr codeCaveAddr = 0x0;
         public static UIntPtr entBaseAddr = 0x0;
@@ -38,6 +31,8 @@ namespace swtor_ESP
 
         static void Main()
         {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;   //invariant culture fix
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture; //invariant culture fix
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             Console.WriteLine("SWTOR-ESP Test");
             int PID = m.GetProcIdFromName("swtor.exe");
@@ -124,6 +119,8 @@ namespace swtor_ESP
         }
         protected override void Render()
         {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;   //invariant culture fix
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture; //invariant culture fix
             DrawMenu();
             DrawBoxESP();
             //DrawTracelineESP();
