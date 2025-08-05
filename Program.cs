@@ -5,6 +5,7 @@ using ImGuiNET;
 using Memory;
 using SharpDX.Direct3D11;
 using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace swtor_ESP
 {
@@ -13,14 +14,22 @@ namespace swtor_ESP
         Program() : base(2560, 1440) { }
         public static Program p = new Program();
         public static Mem m = new Mem();
+        public static List<Entity> entList = new List<Entity> { };
         public bool isESPEnabled = false;
         public static string cameraAddrStr = "swtor.exe+01BFB168";
+        public static string entlistAOB = "48 8B 01 48 8B 40 58 FF 15 ?? ?? ?? ?? 48 8B C8";
+        public static UIntPtr codeCaveAddr = 0x0;
+        public static UIntPtr entBaseAddr = 0x0;
+        public static byte[] entlistHookBytes = { 0x48, 0x89, 0x0D, 0x0C, 0x00, 0x00, 0x00, 0x48, 0x8B, 0x01, 0x48, 0x8B, 0x40, 0x58 };
+        public static uint entbaseOffset = 0x13;
+        public static string entBaseAddrStr = "";
+        public static string entlistAddrStr = "";
+        public static bool entlistHooked = false;
 
         static void Main()
         {
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
             CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
-
             Console.WriteLine("SWTOR-ESP Test");
             int PID = m.GetProcIdFromName("swtor.exe");
             if (PID == 0)
@@ -33,18 +42,68 @@ namespace swtor_ESP
             Console.WriteLine("Process opened successfully.");
             p.Run();
             Thread.Sleep(200);
-            while (true)
+            while (true) 
             {
-                Console.WriteLine("Process running.");
-                Console.ReadLine();
+                if(entlistAddrStr == "")
+                {
+                    AOBScan();
+                }
+                if (!entlistHooked)
+                {
+                    EntHook();
+                }
+                if(entlistAddrStr != "")
+                {
+                    ReadEnts();
+                    AddEntsToList();
+                }
             }
         }
+        public static void AddEntsToList()
+        {
+            if (string.IsNullOrEmpty(entBaseAddrStr) || entBaseAddrStr == "00")
+            {
+                return;
+            }
 
+            if (!entList.Any(ent => ent.baseAddrStr == entBaseAddrStr))
+            {
+                Entity newEnt = new Entity { baseAddrStr = entBaseAddrStr };
+                newEnt.xCoord = m.ReadMemory<float>($"{entBaseAddr},0x68");
+                newEnt.yCoord = m.ReadFloat($"{entBaseAddrStr},0x6C");
+                newEnt.zCoord = m.ReadFloat($"{entBaseAddrStr},0x70");
+                entList.Add(newEnt);
+                Console.WriteLine("Added Entity: " + entBaseAddrStr);
+                Console.WriteLine($"Coords: X-{newEnt.xCoord.ToString()}, Y-{newEnt.yCoord.ToString()}, Z-{newEnt.zCoord.ToString()}");
+            }
+        }
+        public static void ReadEnts()
+        {
+            entBaseAddrStr = ConvertUintToStr(entBaseAddr);
+            UInt64 entBuffer = (UInt64)m.ReadLong(entBaseAddrStr);
+            entBaseAddrStr = ConvertUintToStr(entBuffer);
+            //Console.WriteLine(entBaseAddrStr);
+            Thread.Sleep(100);
+        }
         protected override void Render()
         {
             DrawMenu();
             DrawESP();
             DrawBoxAtOrigin();
+        }
+        static void EntHook()
+        {
+            if(entlistAddrStr != "")
+            {
+                UIntPtr codeCaveAddr = m.CreateCodeCave(entlistAddrStr, entlistHookBytes, 7, 240);
+                entBaseAddr = codeCaveAddr + entbaseOffset;
+                entBaseAddrStr = ConvertUintToStr(entBaseAddr);
+                entlistHooked = true;
+            }
+        }
+        static void AOBScan()
+        {
+            entlistAddrStr = m.AoBScan(entlistAOB).Result.Sum().ToString("X2");
         }
 
         static void DrawMenu()
@@ -72,7 +131,7 @@ namespace swtor_ESP
                 | ImGuiWindowFlags.NoScrollbar
             );
             ImDrawListPtr drawlist = ImGui.GetWindowDrawList();
-            drawlist.AddRectFilled(new Vector2(100, 100), new Vector2(200, 200), ImGui.ColorConvertFloat4ToU32(new Vector4(0f, 1f, 0f, 1f)));
+            drawlist.AddText(new Vector2(50, 50), 10, "ESP Overlay");
 
             float camX = m.ReadFloat($"{cameraAddrStr},0x208");
             float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
@@ -90,7 +149,7 @@ namespace swtor_ESP
 
             if (screenCoords.X != -99)
             {
-                drawlist.AddRectFilled(
+                drawlist.AddRect(
                     screenCoords - new Vector2(50, 50),
                     screenCoords + new Vector2(50, 50),
                     ImGui.ColorConvertFloat4ToU32(new Vector4(1, 0, 0, 1))
@@ -292,6 +351,12 @@ namespace swtor_ESP
                 }
             }
             return result;
+        }
+        static string ConvertUintToStr(ulong conv)
+        {
+            UInt64 buf1 = (UInt64)conv;
+            string retStr = buf1.ToString("X2");
+            return retStr;
         }
     }
 }
