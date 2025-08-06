@@ -18,11 +18,11 @@ namespace swtor_ESP
         public static List<Entity> entList = new List<Entity> { };
         public bool isESPEnabled = false;
         public static string cameraAddrStr = "swtor.exe+01BFB168";
-        public static string entlistAOB = "48 8B 01 48 8B 40 58 FF 15 ?? ?? ?? ?? 48 8B C8";
+        public static string entlistAOB = "F3 44 0F 10 51 68 F3";
         public static UIntPtr codeCaveAddr = 0x0;
         public static UIntPtr entBaseAddr = 0x0;
-        public static byte[] entlistHookBytes = { 0x48, 0x89, 0x0D, 0x0C, 0x00, 0x00, 0x00, 0x48, 0x8B, 0x01, 0x48, 0x8B, 0x40, 0x58 };
-        public static uint entbaseOffset = 0x13;
+        public static byte[] entlistHookBytes = { 0x48, 0x89, 0x0D, 0x0B, 0x00, 0x00, 0x00, 0xF3, 0x44, 0x0F, 0x10, 0x51, 0x68 };
+        public static uint entbaseOffset = 0x12;
         public static string entBaseAddrStr = "";
         public static string entlistAddrStr = "";
         public static bool entlistHooked = false;
@@ -102,7 +102,7 @@ namespace swtor_ESP
         {
             if(entlistAddrStr != "")
             {
-                UIntPtr codeCaveAddr = m.CreateCodeCave(entlistAddrStr, entlistHookBytes, 7, 240);
+                UIntPtr codeCaveAddr = m.CreateCodeCave(entlistAddrStr, entlistHookBytes, 6, 240);
                 entBaseAddr = codeCaveAddr + entbaseOffset;
                 entBaseAddrStr = ConvertUintToStr(entBaseAddr);
                 entlistHooked = true;
@@ -219,8 +219,8 @@ namespace swtor_ESP
                             espColor = Vector4.Lerp(warmColor, coldColor, t); // Interpolate
                         }
                         drawlist.AddRect(
-                            screenCoords - new Vector2(50 / ent.magnitude, 330 / ent.magnitude),
-                            screenCoords + new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
+                            screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
+                            screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
                             ImGui.ColorConvertFloat4ToU32(espColor)
                         );
                     }
@@ -468,7 +468,7 @@ namespace swtor_ESP
         {
             try
             {
-                m.WriteMemory(entlistAddrStr, "bytes", "48 8B 01 48 8B 40 58");
+                m.WriteMemory(entlistAddrStr, "bytes", "F3 44 0F 10 51 68");
             }
             catch
             {
