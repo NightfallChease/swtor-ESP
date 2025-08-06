@@ -28,6 +28,8 @@ namespace swtor_ESP
         public static bool entlistHooked = false;
         public static Vector3 camPos = new Vector3 { };
         public static float espMaxDistance = 10f;
+        public static bool distanceESP = false;
+        public static bool boxESP = false;
 
         static void Main()
         {
@@ -122,7 +124,7 @@ namespace swtor_ESP
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;   //invariant culture fix
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture; //invariant culture fix
             DrawMenu();
-            DrawBoxESP();
+            DrawESP();
             //DrawTracelineESP();
             DrawBoxAtOrigin();
         }
@@ -141,14 +143,19 @@ namespace swtor_ESP
             ImGui.Begin("SWTOR ESP");
             ImGui.Text("Hello, SWTOR!");
             ImGui.Checkbox("Enable ESP", ref p.isESPEnabled);
-            ImGui.SliderFloat("Max Distance", ref espMaxDistance, 10f, 200f);
+            if (p.isESPEnabled)
+            {
+                ImGui.Checkbox("Draw Distance", ref distanceESP);
+                ImGui.Checkbox("Draw Box", ref boxESP);
+                ImGui.SliderFloat("Max Distance", ref espMaxDistance, 10f, 200f);
+            }
             if (ImGui.Button("Exit"))
             {
                 Environment.Exit(0);
             }
             ImGui.End();
         }
-        static void DrawBoxESP()
+        static void DrawESP()
         {
             if (!p.isESPEnabled)
                 return;
@@ -193,12 +200,20 @@ namespace swtor_ESP
 
                     if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
                     {
-                        drawlist.AddRect(
-                            screenCoords - new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
-                            screenCoords + new Vector2(50, 50),
+                        //draw box
+                        if (boxESP)
+                        {
+                            drawlist.AddRect(
+                            screenCoords - new Vector2(50 / ent.magnitude, 330 / ent.magnitude),
+                            screenCoords + new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
                             ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
-                        );
-                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                            );
+                        }
+                        //draw text
+                        if (distanceESP)
+                        {
+                            drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                        }
                     }
                 }
             }
