@@ -30,6 +30,9 @@ namespace swtor_ESP
         public static float espMaxDistance = 10f;
         public static bool distanceESP = false;
         public static bool boxESP = false;
+        public static Vector4 espColor = new Vector4(0, 0, 1, 1);
+        public static bool useESPColor = false;
+        public static bool useDistanceColor = false;
 
         static void Main()
         {
@@ -139,14 +142,20 @@ namespace swtor_ESP
 
         static void DrawMenu()
         {
-            ImGui.Begin("SWTOR ESP");
-            ImGui.Text("Hello, SWTOR!");
+            ImGui.Begin("Nightfall's SWTOR ESP");
             ImGui.Checkbox("Enable ESP", ref p.isESPEnabled);
             if (p.isESPEnabled)
             {
                 ImGui.Checkbox("Draw Distance", ref distanceESP);
                 ImGui.Checkbox("Draw Box", ref boxESP);
                 ImGui.SliderFloat("Max Distance", ref espMaxDistance, 10f, 200f);
+                ImGui.Checkbox("ESP Color", ref useESPColor);
+                if (useESPColor)
+                {
+                    ImGui.Checkbox("Color by distance", ref useDistanceColor);
+                    ImGui.ColorPicker4("EspColor", ref espColor);
+                }
+                
             }
             if (ImGui.Button("Exit"))
             {
@@ -201,10 +210,18 @@ namespace swtor_ESP
                     //draw box
                     if (boxESP)
                     {
+                        if (useDistanceColor)
+                        {
+                            // Interpolate between blue (far) and red (near)
+                            float t = Math.Clamp(ent.magnitude / espMaxDistance, 0f, 1f); // Normalize magnitude
+                            Vector4 coldColor = new Vector4(0, 0, 1, 1); // Blue for far
+                            Vector4 warmColor = new Vector4(1, 0, 0, 1); // Red for near
+                            espColor = Vector4.Lerp(warmColor, coldColor, t); // Interpolate
+                        }
                         drawlist.AddRect(
-                        screenCoords - new Vector2(50 / ent.magnitude, 330 / ent.magnitude),
-                        screenCoords + new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
-                        ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
+                            screenCoords - new Vector2(50 / ent.magnitude, 330 / ent.magnitude),
+                            screenCoords + new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
+                            ImGui.ColorConvertFloat4ToU32(espColor)
                         );
                     }
                     //draw text
@@ -214,7 +231,6 @@ namespace swtor_ESP
                     }
                 }
             }
-
             ImGui.End();
         }
         //static void DrawTracelineESP()
