@@ -29,6 +29,7 @@ namespace swtor_ESP
         public static Vector3 camPos = new Vector3 { };
         public static float espMaxDistance = 10f;
         public static bool distanceESP = false;
+        public static bool baseAddrESP = false;
         public static bool boxESP = false;
         public static Vector4 espColor = new Vector4(0, 0, 1, 1);
         public static bool useESPColor = false;
@@ -147,6 +148,7 @@ namespace swtor_ESP
             if (p.isESPEnabled)
             {
                 ImGui.Checkbox("Draw Distance", ref distanceESP);
+                ImGui.Checkbox("Draw BaseAddr", ref baseAddrESP);
                 ImGui.Checkbox("Draw Box", ref boxESP);
                 ImGui.SliderFloat("Max Distance", ref espMaxDistance, 10f, 200f);
                 ImGui.Checkbox("ESP Color", ref useESPColor);
@@ -197,7 +199,7 @@ namespace swtor_ESP
             float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
             float[,] viewProj = MultiplyMatrices(view, proj);
 
-            // Loop through entities instead of drawing a single fixed box
+            // Loop through entities instead of drawing a single fixed boxw
             foreach (Entity ent in entList)
             {
                 if (ent.coords == Vector3.Zero)
@@ -228,6 +230,10 @@ namespace swtor_ESP
                     if (distanceESP)
                     {
                         drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                    }
+                    if (baseAddrESP)
+                    {
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.baseAddrStr}");
                     }
                 }
             }
