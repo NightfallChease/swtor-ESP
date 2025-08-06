@@ -14,5 +14,6 @@ namespace swtor_ESP
         public string baseAddrStr = "";
         public UIntPtr baseAddr = 0x0;
         public float magnitude;
+        public float playermagnitude;
     }
 }

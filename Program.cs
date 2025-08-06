@@ -18,6 +18,10 @@ namespace swtor_ESP
         public static List<Entity> entList = new List<Entity> { };
         public bool isESPEnabled = false;
         public static string cameraAddrStr = "swtor.exe+01BFB168";
+        public static string localPlayerAddrPtr = "swtor.exe+01BADD28,0x8";
+        public static string localPlayerAddrStr = "";
+        public static Vector3 localPlayerPos = new Vector3 { };
+        public static Vector3 localPlayerSavedPos = new Vector3 { };
         public static string entlistAOB = "F3 44 0F 10 51 68 F3";
         public static UIntPtr codeCaveAddr = 0x0;
         public static UIntPtr entBaseAddr = 0x0;
@@ -27,7 +31,7 @@ namespace swtor_ESP
         public static string entlistAddrStr = "";
         public static bool entlistHooked = false;
         public static Vector3 camPos = new Vector3 { };
-        public static float espMaxDistance = 10f;
+        public static float espMaxDistance = 15f;
         public static bool distanceESP = false;
         public static bool baseAddrESP = false;
         public static bool boxESP = false;
@@ -70,12 +74,37 @@ namespace swtor_ESP
                 }
             }
         }
+        static void DrawMenu()
+        {
+            ImGui.Begin("Nightfall's SWTOR ESP");
+            ImGui.Checkbox("Enable ESP", ref p.isESPEnabled);
+            if (p.isESPEnabled)
+            {
+                ImGui.Checkbox("Draw Distance", ref distanceESP);
+                ImGui.Checkbox("Draw BaseAddr", ref baseAddrESP);
+                ImGui.Checkbox("Draw Box", ref boxESP);
+                ImGui.SliderFloat("Max Distance", ref espMaxDistance, 1f, 15f);
+                ImGui.Checkbox("ESP Color", ref useESPColor);
+                if (useESPColor)
+                {
+                    ImGui.Checkbox("Color by distance", ref useDistanceColor);
+                    ImGui.ColorPicker4("EspColor", ref espColor);
+                }
+
+            }
+            if (ImGui.Button("Exit"))
+            {
+                ImGui.End();
+                Environment.Exit(0);
+            }
+            ImGui.End();
+        }
         public static void AddEntsToList()
         {
             if (string.IsNullOrEmpty(entBaseAddrStr) || entBaseAddrStr == "00")
-            {
                 return;
-            }
+            if (entBaseAddrStr == localPlayerAddrStr)
+                return;
 
             if (!entList.Any(ent => ent.baseAddrStr == entBaseAddrStr))
             {
@@ -91,10 +120,14 @@ namespace swtor_ESP
             {
                 foreach (Entity ent in entList)
                 {
+                    localPlayerPos.X = m.ReadFloat($"{localPlayerAddrStr}+0x68");
+                    localPlayerPos.Y = m.ReadFloat($"{localPlayerAddrStr}+0x6C");
+                    localPlayerPos.Z = m.ReadFloat($"{localPlayerAddrStr}+0x70");
                     ent.coords.X = m.ReadFloat($"{ent.baseAddrStr}+0x68");
                     ent.coords.Y = m.ReadFloat($"{ent.baseAddrStr}+0x6C");
                     ent.coords.Z = m.ReadFloat($"{ent.baseAddrStr}+0x70");
                     ent.magnitude = Vector3.Distance(camPos, ent.coords); // Calculate distance to camera
+                    ent.playermagnitude = Vector3.Distance(localPlayerPos, ent.coords); // Calculate distance to camera
                 }
             }
             catch { }
@@ -117,6 +150,10 @@ namespace swtor_ESP
         }
         public static void ReadEnts()
         {
+            try 
+            {
+                localPlayerAddrStr = m.ReadLong(localPlayerAddrPtr).ToString("X2");
+            }catch { }
             entBaseAddrStr = ConvertUintToStr(entBaseAddr);
             long entBuffer = m.ReadMemory<long>(entBaseAddrStr);
             entBaseAddrStr = entBuffer.ToString("X2");
@@ -129,7 +166,10 @@ namespace swtor_ESP
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             DrawMenu();
             DrawESP();
-            //DrawTracelineESP();
+        }
+        static void savePlayerPos()
+        {
+            localPlayerSavedPos = localPlayerPos;
         }
         static void AOBScan()
         {
@@ -139,32 +179,6 @@ namespace swtor_ESP
                 MessageBox(0, "Failed to find aob!", "Error", 0);
                 Environment.Exit(0);
             }
-        }
-
-        static void DrawMenu()
-        {
-            ImGui.Begin("Nightfall's SWTOR ESP");
-            ImGui.Checkbox("Enable ESP", ref p.isESPEnabled);
-            if (p.isESPEnabled)
-            {
-                ImGui.Checkbox("Draw Distance", ref distanceESP);
-                ImGui.Checkbox("Draw BaseAddr", ref baseAddrESP);
-                ImGui.Checkbox("Draw Box", ref boxESP);
-                ImGui.SliderFloat("Max Distance", ref espMaxDistance, 10f, 200f);
-                ImGui.Checkbox("ESP Color", ref useESPColor);
-                if (useESPColor)
-                {
-                    ImGui.Checkbox("Color by distance", ref useDistanceColor);
-                    ImGui.ColorPicker4("EspColor", ref espColor);
-                }
-                
-            }
-            if (ImGui.Button("Exit"))
-            {
-                ImGui.End();
-                Environment.Exit(0);
-            }
-            ImGui.End();
         }
         static void DrawESP()
         {
@@ -229,7 +243,7 @@ namespace swtor_ESP
                     //draw text
                     if (distanceESP)
                     {
-                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.playermagnitude}");
                     }
                     if (baseAddrESP)
                     {
@@ -239,121 +253,6 @@ namespace swtor_ESP
             }
             ImGui.End();
         }
-        //static void DrawTracelineESP()
-        //{
-        //    if (!p.isESPEnabled)
-        //        return;
-
-        //    ImGui.SetNextWindowPos(new Vector2(0, 0), ImGuiCond.Always);
-        //    ImGui.SetNextWindowSize(new Vector2(2560, 1440), ImGuiCond.Always);
-        //    ImGui.Begin("ESP Overlay",
-        //        ImGuiWindowFlags.NoTitleBar
-        //        | ImGuiWindowFlags.NoResize
-        //        | ImGuiWindowFlags.NoMove
-        //        | ImGuiWindowFlags.NoCollapse
-        //        | ImGuiWindowFlags.NoBackground
-        //        | ImGuiWindowFlags.NoMouseInputs
-        //        | ImGuiWindowFlags.NoScrollbar
-        //    );
-        //    ImDrawListPtr drawlist = ImGui.GetWindowDrawList();
-
-        //    // Read camera position
-        //    float camX = m.ReadFloat($"{cameraAddrStr},0x208");
-        //    float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
-        //    float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
-
-        //    // Read camera angles
-        //    float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
-        //    float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
-
-        //    // Build view/projection matrices
-        //    Vector3 camPos = new Vector3(camX, camY, camZ);
-        //    float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
-        //    float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
-        //    float[,] viewProj = MultiplyMatrices(view, proj);
-
-        //    // Loop through entities instead of drawing a single fixed box
-        //    foreach (Entity ent in entList)
-        //    {
-        //        if (ent.coords == Vector3.Zero)
-        //            continue;
-
-        //        Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
-
-        //        if (screenCoords.X != -99)
-        //        {
-        //            drawlist.AddLine(
-        //                new Vector2(1280, 1440),
-        //                screenCoords + new Vector2(50, 50),
-        //                ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
-        //            );
-        //        }
-        //    }
-
-        //    ImGui.End();
-        //}
-
-        static Viewmatrix ReadViewmatrix()
-        {
-            float camX = m.ReadFloat($"{cameraAddrStr},0x208");
-            float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
-            float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
-
-            float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
-            float pitch = m.ReadFloat($"{cameraAddrStr},0x290");
-
-            float pitchRad = pitch * (float)(System.Math.PI / 2.0);
-
-            float cosPitch = (float)System.Math.Cos(pitchRad);
-            float sinPitch = (float)System.Math.Sin(pitchRad);
-            float cosYaw = (float)System.Math.Cos(yaw);
-            float sinYaw = (float)System.Math.Sin(yaw);
-
-            Vector3 forward = new Vector3(
-                cosPitch * sinYaw,
-                -sinPitch,
-                cosPitch * cosYaw
-            );
-
-            Vector3 eye = new Vector3(camX, camY, camZ);
-            Vector3 target = eye + forward;
-            Vector3 up = new Vector3(0, 1, 0);
-
-            return CreateLookAtMatrix(eye, target, up);
-        }
-
-        static Viewmatrix CreateLookAtMatrix(Vector3 eye, Vector3 target, Vector3 up)
-        {
-            Vector3 zaxis = Vector3.Normalize(eye - target);
-            Vector3 xaxis = Vector3.Normalize(Vector3.Cross(up, zaxis));
-            Vector3 yaxis = Vector3.Cross(zaxis, xaxis);
-
-            Viewmatrix vm = new Viewmatrix
-            {
-                m11 = xaxis.X,
-                m12 = yaxis.X,
-                m13 = zaxis.X,
-                m14 = 0,
-
-                m21 = xaxis.Y,
-                m22 = yaxis.Y,
-                m23 = zaxis.Y,
-                m24 = 0,
-
-                m31 = xaxis.Z,
-                m32 = yaxis.Z,
-                m33 = zaxis.Z,
-                m34 = 0,
-
-                m41 = -Vector3.Dot(xaxis, eye),
-                m42 = -Vector3.Dot(yaxis, eye),
-                m43 = -Vector3.Dot(zaxis, eye),
-                m44 = 1
-            };
-
-            return vm;
-        }
-
         static Vector2 WorldToScreen(Vector3 pos, float[,] viewProj, int screenWidth, int screenHeight)
         {
             float x = pos.X * viewProj[0, 0] + pos.Y * viewProj[1, 0] + pos.Z * viewProj[2, 0] + viewProj[3, 0];
@@ -372,17 +271,6 @@ namespace swtor_ESP
 
             return new Vector2(screenX, screenY);
         }
-
-        static float[,] ViewmatrixToArray(Viewmatrix vm)
-        {
-            float[,] m = new float[4, 4];
-            m[0, 0] = vm.m11; m[0, 1] = vm.m12; m[0, 2] = vm.m13; m[0, 3] = vm.m14;
-            m[1, 0] = vm.m21; m[1, 1] = vm.m22; m[1, 2] = vm.m23; m[1, 3] = vm.m24;
-            m[2, 0] = vm.m31; m[2, 1] = vm.m32; m[2, 2] = vm.m33; m[2, 3] = vm.m34;
-            m[3, 0] = vm.m41; m[3, 1] = vm.m42; m[3, 2] = vm.m43; m[3, 3] = vm.m44;
-            return m;
-        }
-
         static float[,] CreateProjectionMatrix(float fovDegrees, float aspect, float near, float far)
         {
             // FOV set to 80 degrees now
