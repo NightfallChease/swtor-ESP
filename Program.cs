@@ -33,8 +33,8 @@ namespace swtor_ESP
 
         static void Main()
         {
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;   //invariant culture fix
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture; //invariant culture fix
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             Console.WriteLine("SWTOR-ESP Test");
             int PID = m.GetProcIdFromName("swtor.exe");
@@ -121,12 +121,11 @@ namespace swtor_ESP
         }
         protected override void Render()
         {
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;   //invariant culture fix
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture; //invariant culture fix
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
             DrawMenu();
             DrawESP();
             //DrawTracelineESP();
-            DrawBoxAtOrigin();
         }
         static void AOBScan()
         {
@@ -151,6 +150,7 @@ namespace swtor_ESP
             }
             if (ImGui.Button("Exit"))
             {
+                ImGui.End();
                 Environment.Exit(0);
             }
             ImGui.End();
@@ -189,72 +189,6 @@ namespace swtor_ESP
             float[,] viewProj = MultiplyMatrices(view, proj);
 
             // Loop through entities instead of drawing a single fixed box
-            try
-            {
-                foreach (Entity ent in entList)
-                {
-                    if (ent.coords == Vector3.Zero)
-                        continue;
-
-                    Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
-
-                    if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
-                    {
-                        //draw box
-                        if (boxESP)
-                        {
-                            drawlist.AddRect(
-                            screenCoords - new Vector2(50 / ent.magnitude, 330 / ent.magnitude),
-                            screenCoords + new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
-                            ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
-                            );
-                        }
-                        //draw text
-                        if (distanceESP)
-                        {
-                            drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
-                        }
-                    }
-                }
-            }
-            catch { }
-
-            ImGui.End();
-        }
-        static void DrawTracelineESP()
-        {
-            if (!p.isESPEnabled)
-                return;
-
-            ImGui.SetNextWindowPos(new Vector2(0, 0), ImGuiCond.Always);
-            ImGui.SetNextWindowSize(new Vector2(2560, 1440), ImGuiCond.Always);
-            ImGui.Begin("ESP Overlay",
-                ImGuiWindowFlags.NoTitleBar
-                | ImGuiWindowFlags.NoResize
-                | ImGuiWindowFlags.NoMove
-                | ImGuiWindowFlags.NoCollapse
-                | ImGuiWindowFlags.NoBackground
-                | ImGuiWindowFlags.NoMouseInputs
-                | ImGuiWindowFlags.NoScrollbar
-            );
-            ImDrawListPtr drawlist = ImGui.GetWindowDrawList();
-
-            // Read camera position
-            float camX = m.ReadFloat($"{cameraAddrStr},0x208");
-            float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
-            float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
-
-            // Read camera angles
-            float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
-            float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
-
-            // Build view/projection matrices
-            Vector3 camPos = new Vector3(camX, camY, camZ);
-            float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
-            float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
-            float[,] viewProj = MultiplyMatrices(view, proj);
-
-            // Loop through entities instead of drawing a single fixed box
             foreach (Entity ent in entList)
             {
                 if (ent.coords == Vector3.Zero)
@@ -262,18 +196,80 @@ namespace swtor_ESP
 
                 Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
 
-                if (screenCoords.X != -99)
+                if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
                 {
-                    drawlist.AddLine(
-                        new Vector2(1280, 1440),
-                        screenCoords + new Vector2(50, 50),
+                    //draw box
+                    if (boxESP)
+                    {
+                        drawlist.AddRect(
+                        screenCoords - new Vector2(50 / ent.magnitude, 330 / ent.magnitude),
+                        screenCoords + new Vector2(50 / ent.magnitude, 50 / ent.magnitude),
                         ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
-                    );
+                        );
+                    }
+                    //draw text
+                    if (distanceESP)
+                    {
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.magnitude}");
+                    }
                 }
             }
 
             ImGui.End();
         }
+        //static void DrawTracelineESP()
+        //{
+        //    if (!p.isESPEnabled)
+        //        return;
+
+        //    ImGui.SetNextWindowPos(new Vector2(0, 0), ImGuiCond.Always);
+        //    ImGui.SetNextWindowSize(new Vector2(2560, 1440), ImGuiCond.Always);
+        //    ImGui.Begin("ESP Overlay",
+        //        ImGuiWindowFlags.NoTitleBar
+        //        | ImGuiWindowFlags.NoResize
+        //        | ImGuiWindowFlags.NoMove
+        //        | ImGuiWindowFlags.NoCollapse
+        //        | ImGuiWindowFlags.NoBackground
+        //        | ImGuiWindowFlags.NoMouseInputs
+        //        | ImGuiWindowFlags.NoScrollbar
+        //    );
+        //    ImDrawListPtr drawlist = ImGui.GetWindowDrawList();
+
+        //    // Read camera position
+        //    float camX = m.ReadFloat($"{cameraAddrStr},0x208");
+        //    float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
+        //    float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
+
+        //    // Read camera angles
+        //    float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
+        //    float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
+
+        //    // Build view/projection matrices
+        //    Vector3 camPos = new Vector3(camX, camY, camZ);
+        //    float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
+        //    float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
+        //    float[,] viewProj = MultiplyMatrices(view, proj);
+
+        //    // Loop through entities instead of drawing a single fixed box
+        //    foreach (Entity ent in entList)
+        //    {
+        //        if (ent.coords == Vector3.Zero)
+        //            continue;
+
+        //        Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
+
+        //        if (screenCoords.X != -99)
+        //        {
+        //            drawlist.AddLine(
+        //                new Vector2(1280, 1440),
+        //                screenCoords + new Vector2(50, 50),
+        //                ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 1, 1))
+        //            );
+        //        }
+        //    }
+
+        //    ImGui.End();
+        //}
 
         static Viewmatrix ReadViewmatrix()
         {
@@ -353,28 +349,6 @@ namespace swtor_ESP
             float screenY = (1f - y) * 0.5f * screenHeight;
 
             return new Vector2(screenX, screenY);
-        }
-
-        static void DrawBoxAtOrigin()
-        {
-            Viewmatrix vm = ReadViewmatrix();
-
-            // Convert Viewmatrix struct to float[,] for WorldToScreen
-            float[,] view = ViewmatrixToArray(vm);
-            float[,] proj = CreateProjectionMatrix(80f, 2560f / 1440f, 0.1f, 1000f);
-            float[,] viewProj = MultiplyMatrices(view, proj);
-
-            Vector3 origin = new Vector3(0, 0, 0);
-            Vector2 screenCoords = WorldToScreen(origin, viewProj, 2560, 1440);
-
-            if (screenCoords.X != -99 && screenCoords.Y != -99)
-            {
-                ImGui.GetWindowDrawList().AddRectFilled(
-                    screenCoords - new Vector2(50, 50),
-                    screenCoords + new Vector2(50, 50),
-                    ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 0f, 0f, 1f))
-                );
-            }
         }
 
         static float[,] ViewmatrixToArray(Viewmatrix vm)
