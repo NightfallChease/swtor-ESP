@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using ClickableTransparentOverlay;
 using ImGuiNET;
 using Memory;
+using SharpGen.Runtime;
+using WindowsInput;
 
 namespace swtor_ESP
 {
@@ -16,6 +18,7 @@ namespace swtor_ESP
         public static Program p = new Program();
         public static Mem m = new Mem();
         public static List<Entity> entList = new List<Entity> { };
+        public static InputSimulator sim = new InputSimulator();
         public bool isESPEnabled = false;
         public static string cameraAddrStr = "swtor.exe+01BFB168";
         public static string localPlayerAddrPtr = "swtor.exe+01BADD28,0x8";
@@ -38,6 +41,8 @@ namespace swtor_ESP
         public static Vector4 espColor = new Vector4(1, 0, 0, 1);
         public static bool useESPColor = false;
         public static bool useDistanceColor = false;
+        public static ImDrawListPtr drawlist;
+        public static bool entSelection = false;
 
         static void Main()
         {
@@ -74,7 +79,121 @@ namespace swtor_ESP
                 }
             }
         }
-        static void DrawMenu()
+        protected override void Render()
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            DrawMenu();
+            DrawESP();
+            ClickCheck();
+        }
+        void ClickCheck()
+        {
+            if (!entSelection) return;
+            if (sim.InputDeviceState.IsKeyDown(WindowsInput.Native.VirtualKeyCode.LBUTTON))
+            {
+                if (entList.Count <= 0) return;
+                Vector2 mousePos = ImGui.GetMousePos();
+                foreach(Entity ent in entList)
+                {
+                    if (mousePos.X >= ent.rectMin.X && mousePos.X <= ent.rectMax.X && mousePos.Y >= ent.rectMin.Y && mousePos.Y <= ent.rectMax.Y)
+                    {
+                        foreach (Entity ent2 in entList)
+                        {
+                            ent2.selected = false;
+                            ent2.entESPColor = new Vector4(0, 0, 0, 0);
+                        }
+                        ent.entESPColor = new Vector4(0f, 0.931f, 1f, 1f);
+                        ent.selected = true;
+                    }
+                }
+            }
+        }
+        void DrawESP()
+        {
+            if (!p.isESPEnabled)
+                return;
+
+            ImGui.SetNextWindowPos(new Vector2(0, 0), ImGuiCond.Always);
+            ImGui.SetNextWindowSize(new Vector2(2560, 1440), ImGuiCond.Always);
+            ImGui.Begin("ESP Overlay",
+                ImGuiWindowFlags.NoTitleBar
+                | ImGuiWindowFlags.NoResize
+                | ImGuiWindowFlags.NoMove
+                | ImGuiWindowFlags.NoCollapse
+                | ImGuiWindowFlags.NoBackground
+                | ImGuiWindowFlags.NoMouseInputs
+                | ImGuiWindowFlags.NoScrollbar
+            );
+            drawlist = ImGui.GetWindowDrawList();
+
+            // Read camera position
+            float camX = m.ReadFloat($"{cameraAddrStr},0x208");
+            float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
+            float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
+
+            // Read camera angles
+            float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
+            float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
+
+            // Build view/projection matrices
+            camPos = new Vector3(camX, camY, camZ);
+            float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
+            float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
+            float[,] viewProj = MultiplyMatrices(view, proj);
+
+            // Loop through entities instead of drawing a single fixed boxw
+            foreach (Entity ent in entList)
+            {
+                if (ent.coords == Vector3.Zero)
+                    continue;
+
+                Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
+
+                if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
+                {
+                    //draw box
+                    if (boxESP)
+                    {
+                        if (useDistanceColor)
+                        {
+                            // Interpolate between blue (far) and red (near)
+                            float t = Math.Clamp(ent.magnitude / espMaxDistance, 0f, 1f); // Normalize magnitude
+                            Vector4 coldColor = new Vector4(0, 0, 1, 1); // Blue for far
+                            Vector4 warmColor = new Vector4(1, 0, 0, 1); // Red for near
+                            espColor = Vector4.Lerp(warmColor, coldColor, t); // Interpolate
+                        }
+                        ent.rectMin = screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude);
+                        ent.rectMax = screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude);
+                        if (ent.entESPColor != new Vector4(0, 0, 0, 0))
+                        {
+                            drawlist.AddRect(
+                             screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
+                             screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
+                             ImGui.ColorConvertFloat4ToU32(ent.entESPColor));
+                        }
+                        else
+                        {
+                            drawlist.AddRect(
+                            screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
+                            screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
+                            ImGui.ColorConvertFloat4ToU32(espColor));
+                        }
+                    }
+                    //draw text
+                    if (distanceESP)
+                    {
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.playermagnitude}");
+                    }
+                    if (baseAddrESP)
+                    {
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.baseAddrStr}");
+                    }
+                }
+            }
+            ImGui.End();
+        }
+        void DrawMenu()
         {
             ImGui.Begin("Nightfall's SWTOR ESP");
             ImGui.Checkbox("Enable ESP", ref p.isESPEnabled);
@@ -83,6 +202,7 @@ namespace swtor_ESP
                 ImGui.Checkbox("Draw Distance", ref distanceESP);
                 ImGui.Checkbox("Draw BaseAddr", ref baseAddrESP);
                 ImGui.Checkbox("Draw Box", ref boxESP);
+                ImGui.Checkbox("Make entities selectable", ref entSelection);
                 ImGui.SliderFloat("Max Distance", ref espMaxDistance, 1f, 15f);
                 ImGui.Checkbox("ESP Color", ref useESPColor);
                 if (useESPColor)
@@ -160,13 +280,6 @@ namespace swtor_ESP
             Console.WriteLine(entBaseAddrStr);
             Thread.Sleep(100);
         }
-        protected override void Render()
-        {
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
-            DrawMenu();
-            DrawESP();
-        }
         static void AOBScan()
         {
             entlistAddrStr = m.AoBScan(entlistAOB).Result.Sum().ToString("X2");
@@ -176,79 +289,7 @@ namespace swtor_ESP
                 Environment.Exit(0);
             }
         }
-        static void DrawESP()
-        {
-            if (!p.isESPEnabled)
-                return;
-
-            ImGui.SetNextWindowPos(new Vector2(0, 0), ImGuiCond.Always);
-            ImGui.SetNextWindowSize(new Vector2(2560, 1440), ImGuiCond.Always);
-            ImGui.Begin("ESP Overlay",
-                ImGuiWindowFlags.NoTitleBar
-                | ImGuiWindowFlags.NoResize
-                | ImGuiWindowFlags.NoMove
-                | ImGuiWindowFlags.NoCollapse
-                | ImGuiWindowFlags.NoBackground
-                | ImGuiWindowFlags.NoMouseInputs
-                | ImGuiWindowFlags.NoScrollbar
-            );
-            ImDrawListPtr drawlist = ImGui.GetWindowDrawList();
-
-            // Read camera position
-            float camX = m.ReadFloat($"{cameraAddrStr},0x208");
-            float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
-            float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
-
-            // Read camera angles
-            float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
-            float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
-
-            // Build view/projection matrices
-            camPos = new Vector3(camX, camY, camZ);
-            float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
-            float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
-            float[,] viewProj = MultiplyMatrices(view, proj);
-
-            // Loop through entities instead of drawing a single fixed boxw
-            foreach (Entity ent in entList)
-            {
-                if (ent.coords == Vector3.Zero)
-                    continue;
-
-                Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
-
-                if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
-                {
-                    //draw box
-                    if (boxESP)
-                    {
-                        if (useDistanceColor)
-                        {
-                            // Interpolate between blue (far) and red (near)
-                            float t = Math.Clamp(ent.magnitude / espMaxDistance, 0f, 1f); // Normalize magnitude
-                            Vector4 coldColor = new Vector4(0, 0, 1, 1); // Blue for far
-                            Vector4 warmColor = new Vector4(1, 0, 0, 1); // Red for near
-                            espColor = Vector4.Lerp(warmColor, coldColor, t); // Interpolate
-                        }
-                        drawlist.AddRect(
-                            screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
-                            screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
-                            ImGui.ColorConvertFloat4ToU32(espColor)
-                        );
-                    }
-                    //draw text
-                    if (distanceESP)
-                    {
-                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.playermagnitude}");
-                    }
-                    if (baseAddrESP)
-                    {
-                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.baseAddrStr}");
-                    }
-                }
-            }
-            ImGui.End();
-        }
+       
         static Vector2 WorldToScreen(Vector3 pos, float[,] viewProj, int screenWidth, int screenHeight)
         {
             float x = pos.X * viewProj[0, 0] + pos.Y * viewProj[1, 0] + pos.Z * viewProj[2, 0] + viewProj[3, 0];
@@ -284,7 +325,6 @@ namespace swtor_ESP
 
             return proj;
         }
-
         static float[,] CreateViewMatrix(Vector3 camPos, float yaw, float pitchNorm)
         {
             // SWTOR pitch is effectively sin(pitch): -1 = up, +1 = down
@@ -320,10 +360,6 @@ namespace swtor_ESP
 
             return view;
         }
-
-
-
-
         static float[,] MultiplyMatrices(float[,] a, float[,] b)
         {
             float[,] result = new float[4, 4];

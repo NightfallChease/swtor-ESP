@@ -62,3 +62,4 @@ C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\obj\x64\Debug\net8.
 C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\obj\x64\Debug\net8.0\swtor-ESP.genruntimeconfig.cache
 C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\obj\x64\Debug\net8.0\ref\swtor-ESP.dll
 C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\obj\x64\Debug\net8.0\swtor-ESP.sourcelink.json
+C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\bin\x64\Debug\net8.0\WindowsInput.dll

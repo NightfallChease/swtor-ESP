@@ -54,6 +54,10 @@
               "target": "Package",
               "version": "[11.1.0, )"
             },
+            "InputSimulatorCore": {
+              "target": "Package",
+              "version": "[1.0.5, )"
+            },
             "System.Numerics.Vectors": {
               "target": "Package",
               "version": "[4.6.1, )"
