@@ -57,6 +57,15 @@
           }
         }
       },
+      "InputSimulatorCore/1.0.5": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/WindowsInput.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard2.0/WindowsInput.dll": {}
+        }
+      },
       "Libuv/1.9.1": {
         "type": "package",
         "dependencies": {
@@ -2965,6 +2974,18 @@
         "runtimes/win-arm64/native/cimgui.dll",
         "runtimes/win-x64/native/cimgui.dll",
         "runtimes/win-x86/native/cimgui.dll"
+      ]
+    },
+    "InputSimulatorCore/1.0.5": {
+      "sha512": "mLYv9geqp8gG0HjvmbhL5+0v8LmGBgawOS3FHRtK0tGYp0VWfLe8lhYYXUH+vZP1Su+0v0HJQjBx5Jy2wbtYBQ==",
+      "type": "package",
+      "path": "inputsimulatorcore/1.0.5",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "inputsimulatorcore.1.0.5.nupkg.sha512",
+        "inputsimulatorcore.nuspec",
+        "lib/netstandard2.0/WindowsInput.dll"
       ]
     },
     "Libuv/1.9.1": {
@@ -8496,6 +8517,7 @@
   "projectFileDependencyGroups": {
     "net8.0": [
       "ClickableTransparentOverlay >= 11.1.0",
+      "InputSimulatorCore >= 1.0.5",
       "System.Numerics.Vectors >= 4.6.1",
       "Veldrid.ImGui >= 5.72.0"
     ]
@@ -8553,6 +8575,10 @@
           "ClickableTransparentOverlay": {
             "target": "Package",
             "version": "[11.1.0, )"
+          },
+          "InputSimulatorCore": {
+            "target": "Package",
+            "version": "[1.0.5, )"
           },
           "System.Numerics.Vectors": {
             "target": "Package",
