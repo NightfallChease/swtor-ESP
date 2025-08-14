@@ -167,10 +167,6 @@ namespace swtor_ESP
             DrawMenu();
             DrawESP();
         }
-        static void savePlayerPos()
-        {
-            localPlayerSavedPos = localPlayerPos;
-        }
         static void AOBScan()
         {
             entlistAddrStr = m.AoBScan(entlistAOB).Result.Sum().ToString("X2");
@@ -260,8 +256,8 @@ namespace swtor_ESP
             float z = pos.X * viewProj[0, 2] + pos.Y * viewProj[1, 2] + pos.Z * viewProj[2, 2] + viewProj[3, 2];
             float w = pos.X * viewProj[0, 3] + pos.Y * viewProj[1, 3] + pos.Z * viewProj[2, 3] + viewProj[3, 3];
 
-            if (w < 0.01f)
-                return new Vector2(-99, -99);
+            if (w < 0.0001f)
+                return new Vector2(-9999f, -9999f);
 
             x /= w;
             y /= w;
@@ -273,7 +269,6 @@ namespace swtor_ESP
         }
         static float[,] CreateProjectionMatrix(float fovDegrees, float aspect, float near, float far)
         {
-            // FOV set to 80 degrees now
             float fovRad = fovDegrees * (float)System.Math.PI / 180f;
             float yScale = 1.25f / (float)System.Math.Tan(fovRad / 2f);
             float xScale = yScale / aspect;
@@ -285,55 +280,44 @@ namespace swtor_ESP
             proj[2, 2] = -(far + near) / zRange;
             proj[2, 3] = -1f;
             proj[3, 2] = -(2f * far * near) / zRange;
-            proj[3, 3] = 0;  // Notice corrected here, was 0 or 1 before? Usually 0 for D3D-style projection
+            proj[3, 3] = 0;
 
             return proj;
         }
 
         static float[,] CreateViewMatrix(Vector3 camPos, float yaw, float pitchNorm)
         {
-            float pitch = pitchNorm * (float)(System.Math.PI / 3f);
+            // SWTOR pitch: -1 = up, +1 = down. This is effectively sin(pitch).
+            // Derive sin/cos consistently to avoid nonlinear drift.
+            float sinPitch = Math.Clamp(pitchNorm, -1f, 1f);
+            float cosPitch = (float)Math.Sqrt(Math.Max(0f, 1f - sinPitch * sinPitch));
 
-            float cosPitch = (float)System.Math.Cos(pitch);
-            float sinPitch = (float)System.Math.Sin(pitch);
-            float cosYaw = (float)System.Math.Cos(yaw);
-            float sinYaw = (float)System.Math.Sin(yaw);
+            float cosYaw = (float)Math.Cos(yaw);
+            float sinYaw = (float)Math.Sin(yaw);
 
+            // Keep your original Y-up, Z-forward convention:
             Vector3 forward = new Vector3(
-                cosPitch * sinYaw,
-                sinPitch,
-                cosPitch * cosYaw
+                cosPitch * sinYaw, // X
+                sinPitch,          // Y (up)
+                cosPitch * cosYaw  // Z (forward)
             );
 
             Vector3 worldUp = new Vector3(0, 1, 0);
             Vector3 right = Vector3.Normalize(Vector3.Cross(worldUp, forward));
             Vector3 up = Vector3.Normalize(Vector3.Cross(forward, right));
 
-
             float[,] view = new float[4, 4];
 
-            view[0, 0] = right.X;
-            view[1, 0] = right.Y;
-            view[2, 0] = right.Z;
-            view[3, 0] = -Vector3.Dot(right, camPos);
-
-            view[0, 1] = up.X;
-            view[1, 1] = up.Y;
-            view[2, 1] = up.Z;
-            view[3, 1] = -Vector3.Dot(up, camPos);
-
-            view[0, 2] = forward.X;
-            view[1, 2] = forward.Y;
-            view[2, 2] = forward.Z;
-            view[3, 2] = -Vector3.Dot(forward, camPos);
-
-            view[0, 3] = 0;
-            view[1, 3] = 0;
-            view[2, 3] = 0;
-            view[3, 3] = 1;
+            view[0, 0] = right.X; view[1, 0] = right.Y; view[2, 0] = right.Z; view[3, 0] = -Vector3.Dot(right, camPos);
+            view[0, 1] = up.X; view[1, 1] = up.Y; view[2, 1] = up.Z; view[3, 1] = -Vector3.Dot(up, camPos);
+            view[0, 2] = forward.X; view[1, 2] = forward.Y; view[2, 2] = forward.Z; view[3, 2] = -Vector3.Dot(forward, camPos);
+            view[0, 3] = 0; view[1, 3] = 0; view[2, 3] = 0; view[3, 3] = 1;
 
             return view;
         }
+
+
+
 
         static float[,] MultiplyMatrices(float[,] a, float[,] b)
         {

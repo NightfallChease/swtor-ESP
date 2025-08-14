@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("swtor-ESP")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+019b63c4306249c192e0de307c52c2d2cfe99c7a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6a0a568ae83d8edd49fd47b3fe6c3e292ffe2bd2")]
 [assembly: System.Reflection.AssemblyProductAttribute("swtor-ESP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("swtor-ESP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
