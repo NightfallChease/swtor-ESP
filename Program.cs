@@ -18,6 +18,7 @@ namespace swtor_ESP
         public static Program p = new Program();
         public static Mem m = new Mem();
         public static List<Entity> entList = new List<Entity> { };
+        public static Entity selectedEnt = new Entity();
         public static InputSimulator sim = new InputSimulator();
         public bool isESPEnabled = false;
         public static string cameraAddrStr = "swtor.exe+01BFB168";
@@ -43,6 +44,7 @@ namespace swtor_ESP
         public static bool useDistanceColor = false;
         public static ImDrawListPtr drawlist;
         public static bool entSelection = false;
+        public static string clientModelBackup = "";
 
         static void Main()
         {
@@ -77,6 +79,10 @@ namespace swtor_ESP
                     AddEntsToList();
                     UpdateEnts();
                 }
+                if(selectedEnt.baseAddrStr != "" )
+                {
+                    selectedEnt.modelConfig = m.ReadLong($"{selectedEnt.baseAddrStr}+0x288").ToString();
+                }
             }
         }
         protected override void Render()
@@ -100,11 +106,10 @@ namespace swtor_ESP
                     {
                         foreach (Entity ent2 in entList)
                         {
-                            ent2.selected = false;
                             ent2.entESPColor = new Vector4(0, 0, 0, 0);
                         }
                         ent.entESPColor = new Vector4(0f, 0.931f, 1f, 1f);
-                        ent.selected = true;
+                        selectedEnt = ent;
                     }
                 }
             }
@@ -202,7 +207,6 @@ namespace swtor_ESP
                 ImGui.Checkbox("Draw Distance", ref distanceESP);
                 ImGui.Checkbox("Draw BaseAddr", ref baseAddrESP);
                 ImGui.Checkbox("Draw Box", ref boxESP);
-                ImGui.Checkbox("Make entities selectable", ref entSelection);
                 ImGui.SliderFloat("Max Distance", ref espMaxDistance, 1f, 15f);
                 ImGui.Checkbox("ESP Color", ref useESPColor);
                 if (useESPColor)
@@ -210,7 +214,16 @@ namespace swtor_ESP
                     ImGui.Checkbox("Color by distance", ref useDistanceColor);
                     ImGui.ColorPicker4("EspColor", ref espColor);
                 }
-
+                ImGui.Checkbox("Make entities selectable", ref entSelection);
+                if (entSelection)
+                {
+                    ImGui.Text($"Selected entity base addr: {selectedEnt.baseAddrStr}");
+                    ImGui.Text($"Selected entity model config: {selectedEnt.modelConfig}");
+                    if(ImGui.Button("Copy Model"))
+                    {
+                        changeModel();
+                    }
+                }
             }
             if (ImGui.Button("Exit"))
             {
@@ -218,6 +231,23 @@ namespace swtor_ESP
                 Environment.Exit(0);
             }
             ImGui.End();
+        }
+        void changeModel()
+        {
+            string currentModel = m.ReadLong($"{localPlayerAddrStr}+0x288").ToString();
+            if (clientModelBackup == "")
+            {
+                clientModelBackup = currentModel;
+            }
+            if (currentModel != selectedEnt.modelConfig)
+            {
+                m.WriteMemory($"{localPlayerAddrStr}+0x288", "long", $"{selectedEnt.modelConfig}");
+            }
+            else
+            {
+                m.WriteMemory($"{localPlayerAddrStr}+0x288", "long", $"{clientModelBackup}");
+            }
+            Thread.Sleep(300);
         }
         public static void AddEntsToList()
         {
@@ -273,7 +303,8 @@ namespace swtor_ESP
             try 
             {
                 localPlayerAddrStr = m.ReadLong(localPlayerAddrPtr).ToString("X2");
-            }catch { }
+            }
+            catch { }
             entBaseAddrStr = ConvertUintToStr(entBaseAddr);
             long entBuffer = m.ReadMemory<long>(entBaseAddrStr);
             entBaseAddrStr = entBuffer.ToString("X2");
