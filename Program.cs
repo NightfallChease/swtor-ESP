@@ -35,7 +35,7 @@ namespace swtor_ESP
         public static bool distanceESP = false;
         public static bool baseAddrESP = false;
         public static bool boxESP = false;
-        public static Vector4 espColor = new Vector4(0, 0, 1, 1);
+        public static Vector4 espColor = new Vector4(1, 0, 0, 1);
         public static bool useESPColor = false;
         public static bool useDistanceColor = false;
 
@@ -287,23 +287,28 @@ namespace swtor_ESP
 
         static float[,] CreateViewMatrix(Vector3 camPos, float yaw, float pitchNorm)
         {
-            // SWTOR pitch: -1 = up, +1 = down. This is effectively sin(pitch).
-            // Derive sin/cos consistently to avoid nonlinear drift.
-            float sinPitch = Math.Clamp(pitchNorm, -1f, 1f);
-            float cosPitch = (float)Math.Sqrt(Math.Max(0f, 1f - sinPitch * sinPitch));
+            // SWTOR pitch is effectively sin(pitch): -1 = up, +1 = down
+            float sinPitch = Math.Clamp(pitchNorm, -0.9999f, 0.9999f); // tiny clamp avoids cos=0 exactly
+            float cosPitch = (float)Math.Sqrt(1f - sinPitch * sinPitch);
 
-            float cosYaw = (float)Math.Cos(yaw);
-            float sinYaw = (float)Math.Sin(yaw);
+            float cy = (float)Math.Cos(yaw);
+            float sy = (float)Math.Sin(yaw);
 
-            // Keep your original Y-up, Z-forward convention:
-            Vector3 forward = new Vector3(
-                cosPitch * sinYaw, // X
-                sinPitch,          // Y (up)
-                cosPitch * cosYaw  // Z (forward)
-            );
+            // Forward (your Y-up, Z-forward convention)
+            Vector3 forward = Vector3.Normalize(new Vector3(
+                cosPitch * sy,  // X
+                sinPitch,       // Y (up)
+                cosPitch * cy   // Z (forward)
+            ));
 
-            Vector3 worldUp = new Vector3(0, 1, 0);
-            Vector3 right = Vector3.Normalize(Vector3.Cross(worldUp, forward));
+            // Stable horizon-right: depends only on yaw, never collinear with forward at vertical pitch
+            Vector3 right = Vector3.Normalize(new Vector3(
+                cy,  // +X when yaw=0
+                0f,
+                -sy
+            ));
+
+            // Up from forward × right keeps the same handedness you had
             Vector3 up = Vector3.Normalize(Vector3.Cross(forward, right));
 
             float[,] view = new float[4, 4];
