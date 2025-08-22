@@ -14,7 +14,20 @@ namespace swtor_ESP
         //set invariant culture
         [DllImport("User32.dll", CharSet = CharSet.Unicode)]
         public static extern int MessageBox(IntPtr h, string m, string c, int type);
-        Program() : base(2560, 1440) { }
+        
+        [DllImport("user32.dll")]
+        public static extern int GetSystemMetrics(int nIndex);
+        
+        // System metrics constants
+        private const int SM_CXSCREEN = 0; // Width of the screen
+        private const int SM_CYSCREEN = 1; // Height of the screen
+        
+        // Static screen dimensions
+        public static int ScreenWidth = GetSystemMetrics(SM_CXSCREEN);
+        public static int ScreenHeight = GetSystemMetrics(SM_CYSCREEN);
+        public static float AspectRatio = (float)ScreenWidth / ScreenHeight;
+        
+        Program() : base(ScreenWidth, ScreenHeight) { }
         public static Program p = new Program();
         public static Mem m = new Mem();
         public static List<Entity> entList = new List<Entity> { };
@@ -53,6 +66,8 @@ namespace swtor_ESP
             Thread memoryThread = new Thread(MemoryStuff);
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             Console.WriteLine("SWTOR-ESP Test");
+            Console.WriteLine($"Detected screen resolution: {ScreenWidth}x{ScreenHeight}");
+            Console.WriteLine($"Aspect ratio: {AspectRatio:F2}");
             int PID = m.GetProcIdFromName("swtor.exe");
             if (PID == 0)
             {
@@ -130,7 +145,7 @@ namespace swtor_ESP
                 return;
 
             ImGui.SetNextWindowPos(new Vector2(0, 0), ImGuiCond.Always);
-            ImGui.SetNextWindowSize(new Vector2(2560, 1440), ImGuiCond.Always);
+            ImGui.SetNextWindowSize(new Vector2(ScreenWidth, ScreenHeight), ImGuiCond.Always);
             ImGui.Begin("ESP Overlay",
                 ImGuiWindowFlags.NoTitleBar
                 | ImGuiWindowFlags.NoResize
@@ -154,7 +169,7 @@ namespace swtor_ESP
             // Build view/projection matrices
             camPos = new Vector3(camX, camY, camZ);
             float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
-            float[,] proj = CreateProjectionMatrix(60f, 2560f / 1440f, 0.1f, 1000f);
+            float[,] proj = CreateProjectionMatrix(60f, AspectRatio, 0.1f, 1000f);
             float[,] viewProj = MultiplyMatrices(view, proj);
 
             // Loop through entities instead of drawing a single fixed boxw
@@ -164,7 +179,7 @@ namespace swtor_ESP
                     if (ent.coords == Vector3.Zero)
                         continue;
 
-                    Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
+                    Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, ScreenWidth, ScreenHeight);
 
                     if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
                     {
