@@ -21,8 +21,8 @@ namespace swtor_ESP
         public static Entity selectedEnt = new Entity();
         public static InputSimulator sim = new InputSimulator();
         public bool isESPEnabled = false;
-        public static string cameraAddrStr = "swtor.exe+01BFB168";
-        public static string localPlayerAddrPtr = "swtor.exe+01BADD28,0x8";
+        public static string cameraAddrStr = "swtor.exe+01BFC168";
+        public static string localPlayerAddrPtr = "swtor.exe+01BAED28,0x8";
         public static string localPlayerAddrStr = "";
         public static Vector3 localPlayerPos = new Vector3 { };
         public static Vector3 localPlayerSavedPos = new Vector3 { };
@@ -50,6 +50,7 @@ namespace swtor_ESP
         {
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            Thread memoryThread = new Thread(MemoryStuff);
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             Console.WriteLine("SWTOR-ESP Test");
             int PID = m.GetProcIdFromName("swtor.exe");
@@ -63,26 +64,10 @@ namespace swtor_ESP
             Console.WriteLine("Process opened successfully.");
             p.Run();
             Thread.Sleep(200);
+            memoryThread.Start();
             while (true) 
             {
-                if(entlistAddrStr == "")
-                {
-                    AOBScan();
-                }
-                if (!entlistHooked)
-                {
-                    EntHook();
-                }
-                if(entlistAddrStr != "")
-                {
-                    ReadEnts();
-                    AddEntsToList();
-                    UpdateEnts();
-                }
-                if(selectedEnt.baseAddrStr != "" )
-                {
-                    selectedEnt.modelConfig = m.ReadLong($"{selectedEnt.baseAddrStr}+0x288").ToString();
-                }
+                Thread.Sleep(3);
             }
         }
         protected override void Render()
@@ -92,6 +77,31 @@ namespace swtor_ESP
             DrawMenu();
             DrawESP();
             ClickCheck();
+        }
+        static void MemoryStuff()
+        {
+            while (true)
+            {
+                if (entlistAddrStr == "")
+                {
+                    AOBScan();
+                }
+                if (!entlistHooked)
+                {
+                    EntHook();
+                }
+                if (entlistAddrStr != "")
+                {
+                    ReadEnts();
+                    AddEntsToList();
+                    UpdateEnts();
+                }
+                if (selectedEnt.baseAddrStr != "")
+                {
+                    selectedEnt.modelConfig = m.ReadLong($"{selectedEnt.baseAddrStr}+0x288").ToString();
+                }
+                Thread.Sleep(10);
+            }
         }
         void ClickCheck()
         {
@@ -148,54 +158,57 @@ namespace swtor_ESP
             float[,] viewProj = MultiplyMatrices(view, proj);
 
             // Loop through entities instead of drawing a single fixed boxw
-            foreach (Entity ent in entList)
-            {
-                if (ent.coords == Vector3.Zero)
-                    continue;
-
-                Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
-
-                if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
+            try {
+                foreach (Entity ent in entList)
                 {
-                    //draw box
-                    if (boxESP)
+                    if (ent.coords == Vector3.Zero)
+                        continue;
+
+                    Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, 2560, 1440);
+
+                    if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
                     {
-                        if (useDistanceColor)
+                        //draw box
+                        if (boxESP)
                         {
-                            // Interpolate between blue (far) and red (near)
-                            float t = Math.Clamp(ent.magnitude / espMaxDistance, 0f, 1f); // Normalize magnitude
-                            Vector4 coldColor = new Vector4(0, 0, 1, 1); // Blue for far
-                            Vector4 warmColor = new Vector4(1, 0, 0, 1); // Red for near
-                            espColor = Vector4.Lerp(warmColor, coldColor, t); // Interpolate
+                            if (useDistanceColor)
+                            {
+                                // Interpolate between blue (far) and red (near)
+                                float t = Math.Clamp(ent.magnitude / espMaxDistance, 0f, 1f); // Normalize magnitude
+                                Vector4 coldColor = new Vector4(0, 0, 1, 1); // Blue for far
+                                Vector4 warmColor = new Vector4(1, 0, 0, 1); // Red for near
+                                espColor = Vector4.Lerp(warmColor, coldColor, t); // Interpolate
+                            }
+                            ent.rectMin = screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude);
+                            ent.rectMax = screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude);
+                            if (ent.entESPColor != new Vector4(0, 0, 0, 0))
+                            {
+                                drawlist.AddRect(
+                                 screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
+                                 screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
+                                 ImGui.ColorConvertFloat4ToU32(ent.entESPColor));
+                            }
+                            else
+                            {
+                                drawlist.AddRect(
+                                screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
+                                screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
+                                ImGui.ColorConvertFloat4ToU32(espColor));
+                            }
                         }
-                        ent.rectMin = screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude);
-                        ent.rectMax = screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude);
-                        if (ent.entESPColor != new Vector4(0, 0, 0, 0))
+                        //draw text
+                        if (distanceESP)
                         {
-                            drawlist.AddRect(
-                             screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
-                             screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
-                             ImGui.ColorConvertFloat4ToU32(ent.entESPColor));
+                            drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.playermagnitude}");
                         }
-                        else
+                        if (baseAddrESP)
                         {
-                            drawlist.AddRect(
-                            screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
-                            screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
-                            ImGui.ColorConvertFloat4ToU32(espColor));
+                            drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.baseAddrStr}");
                         }
-                    }
-                    //draw text
-                    if (distanceESP)
-                    {
-                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.playermagnitude}");
-                    }
-                    if (baseAddrESP)
-                    {
-                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.baseAddrStr}");
                     }
                 }
             }
+            catch { }
             ImGui.End();
         }
         void DrawMenu()
