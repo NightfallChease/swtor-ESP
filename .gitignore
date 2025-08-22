@@ -1,2 +1,4 @@
 /.vs
 /bin
+/obj/publish
+/obj/x64/Debug

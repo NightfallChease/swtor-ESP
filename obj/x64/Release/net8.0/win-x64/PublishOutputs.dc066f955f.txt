@@ -1,0 +1,6 @@
+C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\bin\Release\net8.0\publish\win-x64\swtor-ESP.pdb
+C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\bin\Release\net8.0\publish\win-x64\cimgui.dll
+C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\bin\Release\net8.0\publish\win-x64\SDL2.dll
+C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\bin\Release\net8.0\publish\win-x64\Memory.pdb
+C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\bin\Release\net8.0\publish\win-x64\Memory.xml
+C:\Users\nightfall\Documents\Coding\!MyProjects\C#\swtor-ESP\bin\Release\net8.0\publish\win-x64\swtor-ESP.exe
