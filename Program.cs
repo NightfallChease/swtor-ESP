@@ -14,7 +14,6 @@ namespace swtor_ESP
         //set invariant culture
         [DllImport("User32.dll", CharSet = CharSet.Unicode)]
         public static extern int MessageBox(IntPtr h, string m, string c, int type);
-        
         [DllImport("user32.dll")]
         public static extern int GetSystemMetrics(int nIndex);
         
@@ -27,7 +26,7 @@ namespace swtor_ESP
         public static int ScreenHeight = GetSystemMetrics(SM_CYSCREEN);
         public static float AspectRatio = (float)ScreenWidth / ScreenHeight;
         
-        Program() : base(ScreenWidth, ScreenHeight) { }
+        Program() : base(ScreenWidth, ScreenHeight) { this.FPSLimit = 144; }
         public static Program p = new Program();
         public static Mem m = new Mem();
         public static List<Entity> entList = new List<Entity> { };
@@ -58,6 +57,7 @@ namespace swtor_ESP
         public static ImDrawListPtr drawlist;
         public static bool entSelection = false;
         public static string clientModelBackup = "";
+        private static bool debugLogging = false; // toggle for console spam
 
         static void Main()
         {
@@ -82,13 +82,12 @@ namespace swtor_ESP
             memoryThread.Start();
             while (true) 
             {
-                Thread.Sleep(3);
+                Thread.Sleep(3); // small sleep to avoid 100% CPU spin
             }
         }
         protected override void Render()
         {
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+            // Removed per-frame culture reset (expensive, unnecessary)
             DrawMenu();
             DrawESP();
             ClickCheck();
@@ -113,9 +112,9 @@ namespace swtor_ESP
                 }
                 if (selectedEnt.baseAddrStr != "")
                 {
-                    selectedEnt.modelConfig = m.ReadLong($"{selectedEnt.baseAddrStr}+0x288").ToString();
+                    try { selectedEnt.modelConfig = m.ReadLong($"{selectedEnt.baseAddrStr}+0x288").ToString(); } catch { }
                 }
-                Thread.Sleep(10);
+                Thread.Sleep(10); // keep original timing
             }
         }
         void ClickCheck()
@@ -157,22 +156,25 @@ namespace swtor_ESP
             );
             drawlist = ImGui.GetWindowDrawList();
 
-            // Read camera position
-            float camX = m.ReadFloat($"{cameraAddrStr},0x208");
-            float camY = m.ReadFloat($"{cameraAddrStr},0x20C");
-            float camZ = m.ReadFloat($"{cameraAddrStr},0x210");
+            // Read camera position once per frame
+            float camX = SafeReadFloat($"{cameraAddrStr},0x208");
+            float camY = SafeReadFloat($"{cameraAddrStr},0x20C");
+            float camZ = SafeReadFloat($"{cameraAddrStr},0x210");
+            float yaw = SafeReadFloat($"{cameraAddrStr},0x218");
+            float pitchNorm = SafeReadFloat($"{cameraAddrStr},0x290");
 
-            // Read camera angles
-            float yaw = m.ReadFloat($"{cameraAddrStr},0x218");
-            float pitchNorm = m.ReadFloat($"{cameraAddrStr},0x290");
-
-            // Build view/projection matrices
             camPos = new Vector3(camX, camY, camZ);
             float[,] view = CreateViewMatrix(camPos, yaw, pitchNorm);
             float[,] proj = CreateProjectionMatrix(60f, AspectRatio, 0.1f, 1000f);
             float[,] viewProj = MultiplyMatrices(view, proj);
 
-            // Loop through entities instead of drawing a single fixed boxw
+            if (entList.Count == 0)
+            {
+                ImGui.End();
+                return;
+            }
+
+            // Loop through entities
             try {
                 foreach (Entity ent in entList)
                 {
@@ -180,46 +182,40 @@ namespace swtor_ESP
                         continue;
 
                     Vector2 screenCoords = WorldToScreen(ent.coords, viewProj, ScreenWidth, ScreenHeight);
+                    if (screenCoords.X == -9999f)
+                        continue;
+                    if (ent.magnitude >= espMaxDistance)
+                        continue;
 
-                    if (screenCoords.X != -99 && ent.magnitude < espMaxDistance)
+                    // Precompute reciprocals
+                    float invMag = ent.magnitude != 0 ? 1f / ent.magnitude : 0f;
+
+                    // draw box
+                    if (boxESP)
                     {
-                        //draw box
-                        if (boxESP)
+                        if (useDistanceColor)
                         {
-                            if (useDistanceColor)
-                            {
-                                // Interpolate between blue (far) and red (near)
-                                float t = Math.Clamp(ent.magnitude / espMaxDistance, 0f, 1f); // Normalize magnitude
-                                Vector4 coldColor = new Vector4(0, 0, 1, 1); // Blue for far
-                                Vector4 warmColor = new Vector4(1, 0, 0, 1); // Red for near
-                                espColor = Vector4.Lerp(warmColor, coldColor, t); // Interpolate
-                            }
-                            ent.rectMin = screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude);
-                            ent.rectMax = screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude);
-                            if (ent.entESPColor != new Vector4(0, 0, 0, 0))
-                            {
-                                drawlist.AddRect(
-                                 screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
-                                 screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
-                                 ImGui.ColorConvertFloat4ToU32(ent.entESPColor));
-                            }
-                            else
-                            {
-                                drawlist.AddRect(
-                                screenCoords - new Vector2(70 / ent.magnitude, 330 / ent.magnitude),
-                                screenCoords + new Vector2(70 / ent.magnitude, 50 / ent.magnitude),
-                                ImGui.ColorConvertFloat4ToU32(espColor));
-                            }
+                            float t = Math.Clamp(ent.magnitude / espMaxDistance, 0f, 1f);
+                            Vector4 coldColor = new Vector4(0, 0, 1, 1); // Blue for far
+                            Vector4 warmColor = new Vector4(1, 0, 0, 1); // Red for near
+                            espColor = Vector4.Lerp(warmColor, coldColor, t); // Keep original behavior (mutates global color)
                         }
-                        //draw text
-                        if (distanceESP)
-                        {
-                            drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.playermagnitude}");
-                        }
-                        if (baseAddrESP)
-                        {
-                            drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.baseAddrStr}");
-                        }
+                        Vector2 halfSize = new Vector2(70 * invMag, 330 * invMag);
+                        ent.rectMin = screenCoords - halfSize;
+                        ent.rectMax = screenCoords + new Vector2(halfSize.X, 50 * invMag);
+                        uint color = ent.entESPColor != new Vector4(0, 0, 0, 0)
+                            ? ImGui.ColorConvertFloat4ToU32(ent.entESPColor)
+                            : ImGui.ColorConvertFloat4ToU32(espColor);
+                        drawlist.AddRect(ent.rectMin, ent.rectMax, color);
+                    }
+                    // draw text
+                    if (distanceESP)
+                    {
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), $"{ent.playermagnitude}");
+                    }
+                    if (baseAddrESP)
+                    {
+                        drawlist.AddText(screenCoords, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), ent.baseAddrStr);
                     }
                 }
             }
@@ -269,11 +265,11 @@ namespace swtor_ESP
             }
             if (currentModel != selectedEnt.modelConfig)
             {
-                m.WriteMemory($"{localPlayerAddrStr}+0x288", "long", $"{selectedEnt.modelConfig}");
+                m.WriteMemory($"{localPlayerAddrStr}+0x288", "long", selectedEnt.modelConfig);
             }
             else
             {
-                m.WriteMemory($"{localPlayerAddrStr}+0x288", "long", $"{clientModelBackup}");
+                m.WriteMemory($"{localPlayerAddrStr}+0x288", "long", clientModelBackup);
             }
             Thread.Sleep(300);
         }
@@ -288,24 +284,28 @@ namespace swtor_ESP
             {
                 Entity newEnt = new Entity { baseAddrStr = entBaseAddrStr };
                 entList.Add(newEnt);
-                Console.WriteLine("Added Entity: " + entBaseAddrStr);
-                Console.WriteLine($"Coords: X-{newEnt.coords.X.ToString()}, Y-{newEnt.coords.Y.ToString()}, Z-{newEnt.coords.Z.ToString()}");
+                if (debugLogging)
+                {
+                    Console.WriteLine("Added Entity: " + entBaseAddrStr);
+                    Console.WriteLine($"Coords: X-{newEnt.coords.X}, Y-{newEnt.coords.Y}, Z-{newEnt.coords.Z}");
+                }
             }
         }
         public static void UpdateEnts()
         {
             try
             {
+                // Read local player position once
+                localPlayerPos.X = m.ReadFloat($"{localPlayerAddrStr}+0x68");
+                localPlayerPos.Y = m.ReadFloat($"{localPlayerAddrStr}+0x6C");
+                localPlayerPos.Z = m.ReadFloat($"{localPlayerAddrStr}+0x70");
                 foreach (Entity ent in entList)
                 {
-                    localPlayerPos.X = m.ReadFloat($"{localPlayerAddrStr}+0x68");
-                    localPlayerPos.Y = m.ReadFloat($"{localPlayerAddrStr}+0x6C");
-                    localPlayerPos.Z = m.ReadFloat($"{localPlayerAddrStr}+0x70");
                     ent.coords.X = m.ReadFloat($"{ent.baseAddrStr}+0x68");
                     ent.coords.Y = m.ReadFloat($"{ent.baseAddrStr}+0x6C");
                     ent.coords.Z = m.ReadFloat($"{ent.baseAddrStr}+0x70");
-                    ent.magnitude = Vector3.Distance(camPos, ent.coords); // Calculate distance to camera
-                    ent.playermagnitude = Vector3.Distance(localPlayerPos, ent.coords); // Calculate distance to camera
+                    ent.magnitude = Vector3.Distance(camPos, ent.coords); // distance to camera
+                    ent.playermagnitude = Vector3.Distance(localPlayerPos, ent.coords); // distance to player
                 }
             }
             catch { }
@@ -319,12 +319,6 @@ namespace swtor_ESP
                 entBaseAddrStr = ConvertUintToStr(entBaseAddr);
                 entlistHooked = true;
             }
-            //if (entlistAddrStr != "")
-            //{
-            //    var ptrAddr = m.Get64BitCode(entListPtr);
-            //    entListPtrAddr = ptrAddr.ToString("X2");
-            //    //Console.WriteLine(ptrAddr.ToString("X2"));
-            //}
         }
         public static void ReadEnts()
         {
@@ -336,7 +330,7 @@ namespace swtor_ESP
             entBaseAddrStr = ConvertUintToStr(entBaseAddr);
             long entBuffer = m.ReadMemory<long>(entBaseAddrStr);
             entBaseAddrStr = entBuffer.ToString("X2");
-            Console.WriteLine(entBaseAddrStr);
+            if (debugLogging) Console.WriteLine(entBaseAddrStr);
             Thread.Sleep(100);
         }
         static void AOBScan()
@@ -441,6 +435,10 @@ namespace swtor_ESP
             UInt64 buf1 = (UInt64)conv;
             string retStr = buf1.ToString("X2");
             return retStr;
+        }
+        private static float SafeReadFloat(string path)
+        {
+            try { return m.ReadFloat(path); } catch { return 0f; }
         }
         private static void OnProcessExit(object sender, EventArgs e)
         {
